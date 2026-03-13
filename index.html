@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spritz Generator</title>
+<style>
+  :root {
+    --green: #00ff88;
+    --green-dim: #00aa55;
+    --bg: #060f0a;
+    --bg2: #0a1a10;
+    --border: #1a3a22;
+    --text: #ccddcc;
+    --err: #ff4444;
+    --blue: #88aaff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+  h1 { color: var(--green); font-size: 1.4rem; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 4px; }
+  .subtitle { color: var(--green-dim); font-size: 0.75rem; letter-spacing: 2px; margin-bottom: 28px; }
+  .card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 20px; width: 100%; max-width: 680px; margin-bottom: 16px;
+  }
+  .card h2 { color: var(--green-dim); font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; }
+  label { display: block; font-size: 0.75rem; color: var(--green-dim); letter-spacing: 1px; margin-bottom: 6px; }
+  input[type="text"], input[type="password"], textarea, select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--green); font-family: inherit; font-size: 0.9rem; padding: 10px 12px;
+    outline: none; transition: border-color 0.2s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--green-dim); }
+  select option { background: var(--bg); }
+  textarea { resize: vertical; min-height: 220px; line-height: 1.6; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 160px; }
+  .btn {
+    display: inline-block; background: transparent; border: 1px solid var(--green);
+    color: var(--green); font-family: inherit; font-size: 0.85rem; letter-spacing: 2px;
+    padding: 10px 20px; border-radius: 4px; cursor: pointer; text-transform: uppercase;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--green); color: var(--bg); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.secondary { border-color: var(--green-dim); color: var(--green-dim); }
+  .btn.secondary:hover:not(:disabled) { background: var(--green-dim); color: var(--bg); }
+  .btn.accent { border-color: var(--blue); color: var(--blue); }
+  .btn.accent:hover:not(:disabled) { background: var(--blue); color: var(--bg); }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .status-box {
+    font-size: 0.8rem; padding: 8px 12px; border-radius: 4px; margin-top: 10px; display: none;
+  }
+  .status-box.ok   { display: block; background: #002211; border: 1px solid var(--green-dim); color: var(--green); }
+  .status-box.err  { display: block; background: #220000; border: 1px solid var(--err); color: var(--err); }
+  .status-box.info { display: block; background: #001122; border: 1px solid #224488; color: var(--blue); }
+  .word-count { font-size: 0.7rem; color: var(--green-dim); text-align: right; margin-top: 4px; }
+  .hint { font-size: 0.7rem; color: #445544; margin-top: 6px; }
+  footer { color: #223322; font-size: 0.65rem; letter-spacing: 2px; margin-top: 24px; }
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid var(--green-dim); border-top-color: var(--green);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .upload-progress { margin-top: 8px; height: 4px; background: var(--border); border-radius: 2px; display: none; }
+  .upload-progress-bar { height: 100%; background: var(--blue); border-radius: 2px; transition: width 0.2s; }
+</style>
+</head>
+<body>
+
+<h1>&#9658; Spritz Generator</h1>
+<div class="subtitle">AI content for your Spritz Reader device</div>
+
+<!-- API + Model -->
+<div class="card">
+  <h2>&#9670; API Settings</h2>
+  <div class="row">
+    <div>
+      <label for="apiKey">Anthropic API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
+      <div class="hint">Stored only in your browser (localStorage). Never sent anywhere except api.anthropic.com.</div>
+    </div>
+    <div>
+      <label for="model">Model</label>
+      <select id="model">
+        <option value="claude-haiku-4-5-20251001">Haiku 4.5 — fastest, cheapest</option>
+        <option value="claude-sonnet-4-6">Sonnet 4.6 — balanced</option>
+        <option value="claude-opus-4-6">Opus 4.6 — best quality</option>
+      </select>
+      <div class="hint">Haiku recommended. Opus for complex topics.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Generate -->
+<div class="card">
+  <h2>&#9670; Generate Content</h2>
+  <div class="row" style="margin-bottom:12px">
+    <div>
+      <label for="topic">Topic / Subject</label>
+      <input type="text" id="topic" placeholder="e.g. quantum computing, stoicism, Mars...">
+    </div>
+    <div>
+      <label for="lang">Output Language</label>
+      <select id="lang">
+        <option value="en">English</option>
+        <option value="pt">Português (BR)</option>
+      </select>
+    </div>
+  </div>
+  <div class="row" style="margin-bottom:12px">
+    <div>
+      <label for="length">Length</label>
+      <select id="length">
+        <option value="short">Short (~300 words)</option>
+        <option value="medium" selected>Medium (~600 words)</option>
+        <option value="long">Long (~1200 words)</option>
+      </select>
+    </div>
+    <div>
+      <label for="style">Style</label>
+      <select id="style">
+        <option value="newsletter">Newsletter / Briefing</option>
+        <option value="summary">Summary / Overview</option>
+        <option value="story">Narrative / Story</option>
+        <option value="explainer">Explainer / How it works</option>
+      </select>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" id="btnGenerate" onclick="generate()">&#9654; Generate</button>
+  </div>
+  <div id="genStatus" class="status-box"></div>
+</div>
+
+<!-- Output -->
+<div class="card">
+  <h2>&#9670; Generated Text</h2>
+  <div style="margin-bottom:10px">
+    <label for="textTitle">Title <span style="color:#334433;font-size:0.7rem">(auto-filled by AI, editable)</span></label>
+    <input type="text" id="textTitle" placeholder="Title will appear after generation..." maxlength="40">
+  </div>
+  <textarea id="output" placeholder="Generated text will appear here...&#10;&#10;You can edit before sending." spellcheck="false"></textarea>
+  <div class="word-count" id="wordCount">0 words</div>
+  <div class="btn-row">
+    <button class="btn" id="btnCopy" onclick="copyText()" disabled>&#9632; Copy Text</button>
+    <button class="btn secondary" id="btnClear" onclick="clearOutput()" disabled>Clear</button>
+  </div>
+</div>
+
+<!-- Send to Device -->
+<div class="card">
+  <h2>&#9670; Send to Device</h2>
+  <div class="row" style="margin-bottom:12px">
+    <div>
+      <label for="deviceIp">Device IP</label>
+      <input type="text" id="deviceIp" placeholder="192.168.1.50">
+      <div class="hint">Find the IP on the device header or About screen.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;justify-content:flex-end">
+      <button class="btn accent" id="btnSend" onclick="sendToDevice()" disabled>&#8679; Send to Device</button>
+    </div>
+  </div>
+  <div class="upload-progress" id="uploadProgress">
+    <div class="upload-progress-bar" id="uploadBar" style="width:0%"></div>
+  </div>
+  <div id="sendStatus" class="status-box"></div>
+</div>
+
+<footer>SPRITZ CONTENT GENERATOR &mdash; @MSouza3D 2026</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+
+window.addEventListener('load', () => {
+  const ls = localStorage;
+  if (ls.getItem('spritz_api_key'))  $('apiKey').value   = ls.getItem('spritz_api_key');
+  if (ls.getItem('spritz_model'))    $('model').value    = ls.getItem('spritz_model');
+  if (ls.getItem('spritz_device_ip')) $('deviceIp').value = ls.getItem('spritz_device_ip');
+  if (ls.getItem('spritz_lang'))     $('lang').value     = ls.getItem('spritz_lang');
+
+  $('apiKey').addEventListener('change',   () => ls.setItem('spritz_api_key',   $('apiKey').value.trim()));
+  $('model').addEventListener('change',    () => ls.setItem('spritz_model',      $('model').value));
+  $('deviceIp').addEventListener('change', () => ls.setItem('spritz_device_ip', $('deviceIp').value.trim()));
+  $('lang').addEventListener('change',     () => ls.setItem('spritz_lang',       $('lang').value));
+  $('output').addEventListener('input', updateWordCount);
+});
+
+function setStatus(elId, msg, type) {
+  const el = $(elId);
+  el.className = 'status-box ' + type;
+  el.innerHTML = msg;
+}
+
+function updateWordCount() {
+  const txt = $('output').value.trim();
+  $('wordCount').textContent = (txt ? txt.split(/\s+/).length : 0) + ' words';
+}
+
+function buildPrompt() {
+  const topic  = $('topic').value.trim();
+  const lang   = $('lang').value;
+  const length = $('length').value;
+  const style  = $('style').value;
+  const words  = { short: 300, medium: 600, long: 1200 }[length];
+  const styles = {
+    newsletter: 'a newsletter-style briefing with key facts and insights',
+    summary:    'a clear, structured summary and overview',
+    story:      'an engaging narrative with a beginning, middle and end',
+    explainer:  'a plain-language explainer of how it works and why it matters',
+  };
+  const langInstr = lang === 'pt' ? 'Write entirely in Brazilian Portuguese (PT-BR).' : 'Write in clear, accessible English.';
+
+  return `You are a content writer for a minimal e-reader device that displays one word at a time (RSVP reading).
+
+Respond with a JSON object with exactly two fields:
+- "title": a short descriptive title (max 30 characters, plain text, no quotes)
+- "text": the article body
+
+Article requirements:
+- Topic: "${topic}"
+- Style: ${styles[style]}
+- Target length: approximately ${words} words
+- ${langInstr}
+- Plain text only: NO markdown, NO bullet points, NO headers, NO special symbols
+- Short paragraphs separated by blank lines
+- Flowing style optimized for rapid serial reading (one word at a time)
+- Begin directly with the content (no title, no byline in the text field)
+
+Respond ONLY with the JSON object, no other text.`;
+}
+
+async function generate() {
+  const apiKey = $('apiKey').value.trim();
+  const topic  = $('topic').value.trim();
+  if (!apiKey) { setStatus('genStatus', 'Enter your Anthropic API key.', 'err'); return; }
+  if (!topic)  { setStatus('genStatus', 'Enter a topic.', 'err'); return; }
+
+  localStorage.setItem('spritz_api_key', apiKey);
+  $('btnGenerate').disabled = true;
+  $('btnCopy').disabled = true;
+  $('btnClear').disabled = true;
+  $('btnSend').disabled = true;
+  $('output').value = '';
+  $('textTitle').value = '';
+  updateWordCount();
+  setStatus('genStatus', '<span class="spinner"></span>Generating...', 'info');
+
+  const maxTokens = { short: 600, medium: 1100, long: 2100 }[$('length').value];
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: $('model').value,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: buildPrompt() }],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw  = data?.content?.[0]?.text || '';
+
+    // Parse JSON response
+    let title = '', text = '';
+    try {
+      const json = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim());
+      title = (json.title || '').trim().slice(0, 40);
+      text  = (json.text  || '').trim();
+    } catch {
+      // Fallback: treat whole response as text, derive title from topic
+      text  = raw.trim();
+      title = $('topic').value.trim().slice(0, 30);
+    }
+
+    $('output').value   = text;
+    $('textTitle').value = title;
+    updateWordCount();
+    $('btnCopy').disabled  = false;
+    $('btnClear').disabled = false;
+    $('btnSend').disabled  = false;
+
+    const wc = text.split(/\s+/).length;
+    setStatus('genStatus', `Done &mdash; ${wc} words. Edit if needed, then copy or send directly to device.`, 'ok');
+
+  } catch (e) {
+    setStatus('genStatus', 'Error: ' + e.message, 'err');
+  } finally {
+    $('btnGenerate').disabled = false;
+  }
+}
+
+async function copyText() {
+  const text = $('output').value.trim();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus('genStatus', 'Copied! Paste into the Spritz WebUI upload field.', 'ok');
+  } catch {
+    $('output').select();
+    setStatus('genStatus', 'Select All + Copy manually (Ctrl+A, Ctrl+C).', 'info');
+  }
+}
+
+function clearOutput() {
+  $('output').value = '';
+  $('textTitle').value = '';
+  updateWordCount();
+  $('btnCopy').disabled = true;
+  $('btnClear').disabled = true;
+  $('btnSend').disabled = true;
+  $('genStatus').className = 'status-box';
+  $('sendStatus').className = 'status-box';
+}
+
+// --- Send to Device ---
+const CHUNK_SIZE = 4096;
+
+async function sendToDevice() {
+  const ip    = $('deviceIp').value.trim();
+  const text  = $('output').value.trim();
+  const title = $('textTitle').value.trim() || $('topic').value.trim().slice(0, 30) || 'Generated';
+
+  if (!ip)   { setStatus('sendStatus', 'Enter the device IP address.', 'err'); return; }
+  if (!text) { setStatus('sendStatus', 'Generate text first.', 'err'); return; }
+
+  localStorage.setItem('spritz_device_ip', ip);
+  const base = `http://${ip}`;
+
+  $('btnSend').disabled = true;
+  $('uploadProgress').style.display = 'block';
+  $('uploadBar').style.width = '0%';
+  setStatus('sendStatus', '<span class="spinner"></span>Connecting to device...', 'info');
+
+  try {
+    // 1. Start upload
+    const startRes = await fetch(`${base}/upload/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: title }),
+    });
+    if (!startRes.ok) throw new Error(`Start failed: HTTP ${startRes.status}`);
+    const { uploadId } = await startRes.json();
+
+    // 2. Send chunks
+    const chunks = [];
+    for (let i = 0; i < text.length; i += CHUNK_SIZE) chunks.push(text.slice(i, i + CHUNK_SIZE));
+    const total = chunks.length;
+
+    for (let i = 0; i < total; i++) {
+      setStatus('sendStatus', `<span class="spinner"></span>Uploading chunk ${i+1} / ${total}...`, 'info');
+      $('uploadBar').style.width = Math.round((i / total) * 80) + '%';
+
+      const chunkRes = await fetch(`${base}/upload/chunk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadId, index: i, chunk: chunks[i] }),
+      });
+      if (!chunkRes.ok) throw new Error(`Chunk ${i} failed: HTTP ${chunkRes.status}`);
+    }
+
+    // 3. Finish
+    $('uploadBar').style.width = '90%';
+    setStatus('sendStatus', '<span class="spinner"></span>Finalizing...', 'info');
+    const finishRes = await fetch(`${base}/upload/finish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uploadId, name: title, chunks: total }),
+    });
+    if (!finishRes.ok) throw new Error(`Finish failed: HTTP ${finishRes.status}`);
+
+    $('uploadBar').style.width = '100%';
+    setStatus('sendStatus', `&#10003; Sent! "${title}" is now on your device. Switch to it from the Load Text menu.`, 'ok');
+
+  } catch (e) {
+    let msg = e.message;
+    if (e instanceof TypeError) msg = `Cannot reach device at ${ip}. Check IP and that the device is on the same network. (CORS headers required on firmware v3.8+)`;
+    setStatus('sendStatus', 'Error: ' + msg, 'err');
+  } finally {
+    $('btnSend').disabled = false;
+    setTimeout(() => { $('uploadProgress').style.display = 'none'; }, 1500);
+  }
+}
+</script>
+</body>
+</html>
