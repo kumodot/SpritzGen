@@ -194,8 +194,15 @@ window.addEventListener('load', () => {
   $('model').addEventListener('change',    () => ls.setItem('spritz_model',      $('model').value));
   $('deviceIp').addEventListener('change', () => ls.setItem('spritz_device_ip', $('deviceIp').value.trim()));
   $('lang').addEventListener('change',     () => ls.setItem('spritz_lang',       $('lang').value));
-  $('output').addEventListener('input', updateWordCount);
+  $('output').addEventListener('input', () => { updateWordCount(); updateSendButton(); });
+  $('textTitle').addEventListener('input', updateSendButton);
 });
+
+function updateSendButton() {
+  const hasText  = $('output').value.trim().length > 0;
+  const hasTitle = $('textTitle').value.trim().length > 0;
+  $('btnSend').disabled = !(hasText && hasTitle);
+}
 
 function setStatus(elId, msg, type) {
   const el = $(elId);
@@ -295,12 +302,12 @@ async function generate() {
       title = $('topic').value.trim().slice(0, 30);
     }
 
-    $('output').value   = text;
+    $('output').value    = text;
     $('textTitle').value = title;
     updateWordCount();
     $('btnCopy').disabled  = false;
     $('btnClear').disabled = false;
-    $('btnSend').disabled  = false;
+    updateSendButton();
 
     const wc = text.split(/\s+/).length;
     setStatus('genStatus', `Done &mdash; ${wc} words. Edit if needed, then copy or send directly to device.`, 'ok');
