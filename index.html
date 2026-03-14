@@ -194,14 +194,16 @@ window.addEventListener('load', () => {
   $('model').addEventListener('change',    () => ls.setItem('spritz_model',      $('model').value));
   $('deviceIp').addEventListener('change', () => ls.setItem('spritz_device_ip', $('deviceIp').value.trim()));
   $('lang').addEventListener('change',     () => ls.setItem('spritz_lang',       $('lang').value));
-  $('output').addEventListener('input', () => { updateWordCount(); updateSendButton(); });
-  $('textTitle').addEventListener('input', updateSendButton);
+  $('output').addEventListener('input', () => { updateWordCount(); updateOutputButtons(); });
+  $('textTitle').addEventListener('input', updateOutputButtons);
 });
 
-function updateSendButton() {
+function updateOutputButtons() {
   const hasText  = $('output').value.trim().length > 0;
   const hasTitle = $('textTitle').value.trim().length > 0;
-  $('btnSend').disabled = !(hasText && hasTitle);
+  $('btnCopy').disabled  = !hasText;
+  $('btnClear').disabled = !hasText;
+  $('btnSend').disabled  = !(hasText && hasTitle);
 }
 
 function setStatus(elId, msg, type) {
@@ -305,9 +307,7 @@ async function generate() {
     $('output').value    = text;
     $('textTitle').value = title;
     updateWordCount();
-    $('btnCopy').disabled  = false;
-    $('btnClear').disabled = false;
-    updateSendButton();
+    updateOutputButtons();
 
     const wc = text.split(/\s+/).length;
     setStatus('genStatus', `Done &mdash; ${wc} words. Edit if needed, then copy or send directly to device.`, 'ok');
@@ -335,9 +335,7 @@ function clearOutput() {
   $('output').value = '';
   $('textTitle').value = '';
   updateWordCount();
-  $('btnCopy').disabled = true;
-  $('btnClear').disabled = true;
-  $('btnSend').disabled = true;
+  updateOutputButtons();
   $('genStatus').className = 'status-box';
   $('sendStatus').className = 'status-box';
 }
@@ -402,9 +400,18 @@ async function sendToDevice() {
     setStatus('sendStatus', `&#10003; Sent! "${title}" is now on your device. Switch to it from the Load Text menu.`, 'ok');
 
   } catch (e) {
-    let msg = e.message;
-    if (e instanceof TypeError) msg = `Cannot reach device at ${ip}. Check IP and that the device is on the same network. (CORS headers required on firmware v3.8+)`;
-    setStatus('sendStatus', 'Error: ' + msg, 'err');
+    if (e instanceof TypeError) {
+      // Mixed content (iOS/Safari) or network error — offer manual fallback
+      const webUiUrl = `http://${ip}`;
+      setStatus('sendStatus',
+        `&#9888; Your browser blocked the direct upload (mixed content policy on iOS/Safari).<br><br>` +
+        `<strong>Manual workaround:</strong><br>` +
+        `1. <a href="#" onclick="copyText();return false;" style="color:var(--green)">Copy the text</a> &mdash; then<br>` +
+        `2. <a href="${webUiUrl}" target="_blank" style="color:var(--blue)">Open the device WebUI &#8599;</a> and paste it there.`,
+        'err');
+    } else {
+      setStatus('sendStatus', 'Error: ' + e.message, 'err');
+    }
   } finally {
     $('btnSend').disabled = false;
     setTimeout(() => { $('uploadProgress').style.display = 'none'; }, 1500);
